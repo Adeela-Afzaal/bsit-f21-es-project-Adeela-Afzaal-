@@ -1,0 +1,152 @@
+﻿@page "/todo"
+@inject ITodoService TodoService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@using Adeela.Data
+@using Adeela.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Forms
+
+<div style="background: linear-gradient(120deg, #f6d365, #fda085); min-height: 100vh; padding: 20px; font-family: Arial, sans-serif; color: #2c3e50;">
+    <div style="margin-bottom: 20px; background-color: #ffffffaa; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
+        <EditForm Model="@taskToEdit" OnValidSubmit="SaveTodoItem" style="display: flex; flex-direction: column; gap: 15px;">
+            <InputText @bind-Value="taskToEdit.Title" placeholder="Task Title" style="padding: 10px; font-size: 16px; border: 2px solid #ccc; border-radius: 6px;" />
+            <InputTextArea @bind-Value="taskToEdit.Description" placeholder="Task Description" style="padding: 10px; font-size: 16px; border: 2px solid #ccc; border-radius: 6px;" />
+            
+            <InputFile OnChange="HandleImageUpload" style="font-size: 14px;" />
+            @if (!string.IsNullOrEmpty(taskToEdit.ImagePath))
+            {
+                <img src="@taskToEdit.ImagePath" alt="Task Image" style="max-width: 200px; max-height: 200px; border: 1px solid #ccc; border-radius: 4px;" />
+            }
+
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" style="background-color: #3498db; color: white; font-size: 16px; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
+                    @(taskToEdit.Id == 0 ? "Add Task" : "Update Task")
+                </button>
+                @if (taskToEdit.Id != 0)
+                {
+                    <button @onclick="CancelEdit" type="button" style="background-color: #e74c3c; color: white; font-size: 16px; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
+                        Cancel
+                    </button>
+                }
+            </div>
+        </EditForm>
+    </div>
+
+    <h3 style="color: #2c3e50; font-family: Arial, sans-serif; text-align: center; font-size: 24px; margin-top: 30px;">To-Do List</h3>
+
+    <ul style="list-style: none; padding: 0; margin: 20px auto; max-width: 600px;">
+        @foreach (var item in todoItems)
+        {
+            <li style="margin-bottom: 20px; padding: 15px; background-color: #ffffffaa; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" checked="@item.IsComplete" @onchange="() => ToggleCompletion(item.Id)" />
+                        <span style="font-size: 18px; font-weight: bold; color: #34495e; text-decoration: @(item.IsComplete ? "line-through" : "none");">
+                            @item.Title
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button @onclick="() => StartEdit(item)" style="background-color: #f39c12; color: white; font-size: 14px; padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer;">
+                            Edit
+                        </button>
+                        <button @onclick="() => DeleteTodoItem(item.Id)" style="background-color: #e74c3c; color: white; font-size: 14px; padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer;">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(item.Description))
+                {
+                    <p style="margin-top: 10px; color: #555;">@item.Description</p>
+                }
+                @if (!string.IsNullOrEmpty(item.ImagePath))
+                {
+                    <img src="@item.ImagePath" alt="Task Image" style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; border-radius: 6px; margin-top: 10px;" />
+                }
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    private List<TodoItem> todoItems = new();
+    private TodoItem taskToEdit = new(); // Used for adding or editing a task
+    private IBrowserFile uploadedImage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated ?? false)
+        {
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            todoItems = await TodoService.GetTodoItemsAsync(userId);
+        }
+        else
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        uploadedImage = e.File;
+        var filePath = Path.Combine("wwwroot/uploads", $"{Guid.NewGuid()}_{uploadedImage.Name}");
+        taskToEdit.ImagePath = $"/uploads/{Path.GetFileName(filePath)}";
+
+        await using var fileStream = new FileStream(filePath, FileMode.Create);
+        await uploadedImage.OpenReadStream(maxAllowedSize: 10_000_000).CopyToAsync(fileStream);
+    }
+
+    private async Task SaveTodoItem()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            taskToEdit.UserId = userId;
+
+            if (taskToEdit.Id == 0) // Add new task
+            {
+                await TodoService.AddTodoItemAsync(taskToEdit);
+            }
+            else // Update existing task
+            {
+                await TodoService.UpdateTodoItemAsync(taskToEdit);
+            }
+
+            taskToEdit = new TodoItem(); // Reset form
+            todoItems = await TodoService.GetTodoItemsAsync(userId); // Refresh list
+        }
+    }
+
+    private void StartEdit(TodoItem item)
+    {
+        taskToEdit = new TodoItem
+        {
+            Id = item.Id,
+            Title = item.Title,
+            IsComplete = item.IsComplete,
+            UserId = item.UserId,
+            Description = item.Description,
+            ImagePath = item.ImagePath
+        };
+    }
+
+    private void CancelEdit()
+    {
+        taskToEdit = new TodoItem(); // Reset form
+    }
+
+    private async Task ToggleCompletion(int id)
+    {
+        await TodoService.ToggleTodoItemCompletionAsync(id);
+        await OnInitializedAsync();
+    }
+
+    private async Task DeleteTodoItem(int id)
+    {
+        await TodoService.DeleteTodoItemAsync(id);
+        await OnInitializedAsync();
+    }
+}

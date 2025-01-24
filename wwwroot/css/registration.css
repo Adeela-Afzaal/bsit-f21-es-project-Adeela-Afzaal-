@@ -1,0 +1,72 @@
+﻿body {
+    background: url('../images/forms-1.jpg');
+    background-repeat: no-repeat;
+    background-position: top center;
+    background-size: cover;
+}
+
+.main {
+    margin-top: 110px;
+    margin-left: 25%;
+    height: 100%;
+}
+
+.image {
+    width: 400px;
+    margin-left: 40px;
+    border: none;
+    border-radius: 20px;
+}
+
+.form-box {
+    background-color: transparent;
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid black;
+}
+
+    .form-box input {
+        border-radius: 10px;
+        background: transparent;
+        border: 1px solid black;
+    }
+
+.input-group-text {
+    border-radius: 0px 10px 10px 0px;
+}
+
+.form-box input {
+    border: 1px solid black;
+}
+
+.input-group-text:focus {
+    box-shadow: 0 0 0;
+    border: 1px solid black;
+}
+
+.register-btn {
+    background-image: linear-gradient(to left, white,black,white);
+    border: none;
+    border-radius: 10px;
+}
+
+.terms {
+    margin-top: 80px;
+}
+
+.form-box a {
+    text-decoration: none;
+    color: #f80f88;
+}
+
+    .form-box a:hover {
+        color: #63118b;
+    }
+
+@media (min-width:768) {
+    .main {
+        margin-top: 10px;
+        margin-left: 150px;
+        height: 100%;
+    }
+}
